@@ -42,7 +42,7 @@ public class PersistenceBrokerThreadMapping
      * The Collection is iterated trough when calling the <CODE>shutdown()</CODE> method and all the maps that are
      * still alive will be cleared.
      */
-    private static Collection loadedHMs = new HashSet();
+    private static ThreadLocal loadedHMs = new ThreadLocal();
 
     /**
      * The hashmap that maps PBKeys to current brokers for the thread
@@ -65,7 +65,11 @@ public class PersistenceBrokerThreadMapping
             map = new HashMap();
             currentBrokerMap.set(map);
 
-            loadedHMs.add(map);
+            Collection loadedMaps = (Collection) loadedHMs.get();
+            if (loadedMaps == null) {
+				loadedMaps = new HashSet();
+            }
+            loadedMaps.add(map);
         }
         else
         {
@@ -106,7 +110,10 @@ public class PersistenceBrokerThreadMapping
             if(map.isEmpty())
             {
                 currentBrokerMap.set(null);
-                loadedHMs.remove(map);
+                Collection loadedMaps = (Collection) loadedHMs.get();
+                if (loadedMaps != null) {
+					loadedMaps.remove(map);
+                }
             }
         }
     }
@@ -160,12 +167,17 @@ public class PersistenceBrokerThreadMapping
      */
     public static void shutdown()
     {
-        for(Iterator it = loadedHMs.iterator(); it.hasNext();)
-        {
-            ((HashMap) it.next()).clear();
+		Collection loadedMaps = (Collection) loadedHMs.get();
+        if (loadedMaps != null) {
+	        for(Iterator it = loadedMaps.iterator(); it.hasNext();)
+	        {
+	            ((HashMap) it.next()).clear();
+	        }
+	        loadedMaps.clear();
+	        loadedMaps = null;
+	        loadedHMs = null;
         }
-        loadedHMs.clear();
-        loadedHMs = null;
         currentBrokerMap = null;
     }
 }
+
