@@ -42,7 +42,8 @@ public class PersistenceBrokerThreadMapping
      * The Collection is iterated trough when calling the <CODE>shutdown()</CODE> method and all the maps that are
      * still alive will be cleared.
      */
-    private static ThreadLocal loadedHMs = new ThreadLocal();
+    private static Collection loadedHMs = new HashSet();
+    private static final Object lock = new Object();
 
     /**
      * The hashmap that maps PBKeys to current brokers for the thread
@@ -65,11 +66,9 @@ public class PersistenceBrokerThreadMapping
             map = new HashMap();
             currentBrokerMap.set(map);
 
-            Collection loadedMaps = (Collection) loadedHMs.get();
-            if (loadedMaps == null) {
-				loadedMaps = new HashSet();
+            synchronized(lock) {
+                loadedHMs.add(map);
             }
-            loadedMaps.add(map);
         }
         else
         {
@@ -110,9 +109,8 @@ public class PersistenceBrokerThreadMapping
             if(map.isEmpty())
             {
                 currentBrokerMap.set(null);
-                Collection loadedMaps = (Collection) loadedHMs.get();
-                if (loadedMaps != null) {
-					loadedMaps.remove(map);
+                synchronized(lock) {
+                    loadedHMs.remove(map);
                 }
             }
         }
@@ -167,17 +165,14 @@ public class PersistenceBrokerThreadMapping
      */
     public static void shutdown()
     {
-		Collection loadedMaps = (Collection) loadedHMs.get();
-        if (loadedMaps != null) {
-	        for(Iterator it = loadedMaps.iterator(); it.hasNext();)
-	        {
-	            ((HashMap) it.next()).clear();
-	        }
-	        loadedMaps.clear();
-	        loadedMaps = null;
-	        loadedHMs = null;
+        synchronized(lock) {
+            for(Iterator it = loadedHMs.iterator(); it.hasNext();)
+            {
+                ((HashMap) it.next()).clear();
+            }
+            loadedHMs.clear();
+            loadedHMs = null;
         }
         currentBrokerMap = null;
     }
 }
-
